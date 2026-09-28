@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Domain não referencia NADA: nem EF Core, nem MediatR, nem pacotes Microsoft.*.
+       A regra é garantida pelos testes de arquitetura (NetArchTest). -->
+  <PropertyGroup>
+    <RootNamespace>FieldFlow.Domain</RootNamespace>
+  </PropertyGroup>
+</Project>

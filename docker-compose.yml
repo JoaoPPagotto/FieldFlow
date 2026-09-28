@@ -1,0 +1,40 @@
+name: fieldflow
+
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-fieldflow}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fieldflow_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-fieldflow}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-fieldflow} -d ${POSTGRES_DB:-fieldflow}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: src/FieldFlow.Api/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=${POSTGRES_DB:-fieldflow};Username=${POSTGRES_USER:-fieldflow};Password=${POSTGRES_PASSWORD:-fieldflow_dev_password}"
+      Seed__DemoData: ${SEED_DEMO_DATA:-true}
+    ports:
+      - "${API_PORT:-8080}:8080"
+
+  # frontend: adicionado na Fase 8
+
+volumes:
+  pgdata:
