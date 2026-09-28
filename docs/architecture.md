@@ -8,7 +8,7 @@ Api ──► Application ──► Domain
 ```
 
 - **Domain** não referencia nada (nem EF Core, nem MediatR, nem `Microsoft.*`).
-- **Application** define as abstrações (`IRepository<T>`, `IUnitOfWork`, `IDateTimeProvider`, `ICurrentUser`); **Infrastructure** implementa.
+- **Domain** define os contratos de persistência (`IRepository<T>`, `IUnitOfWork`, `IWorkOrderRepository`...) e **Application** os de serviços (`IDateTimeProvider`, `ICurrentUser`, `IBusinessCalendarProvider`); **Infrastructure** implementa todos.
 - As regras são verificadas por testes com **NetArchTest** (`tests/FieldFlow.Api.IntegrationTests/Architecture`).
 
 ## Padrões adotados
@@ -32,3 +32,30 @@ Api ──► Application ──► Domain
 - Tabelas e PKs nomeadas explicitamente na configuração Fluent de cada entidade (`IEntityTypeConfiguration<T>`).
 - O `ApplicationDbContext` é a **fonte única de verdade** do mapeamento — nada de `[Table]`/`[Column]` nas entidades.
 - `Program` aplica as migrations no boot; a ausência de banco **não** impede a subida (o `/health/ready` reporta).
+
+## Migrations
+
+Enquanto não existir migration versionada, o boot cria o schema com `EnsureCreated` (aviso no log).
+Para versionar o schema (recomendado antes da Fase 2):
+
+```bash
+./scripts/add-migration.sh Initial        # ou .\scripts\add-migration.ps1 Initial
+docker compose down -v                    # descarta o banco criado via EnsureCreated
+docker compose up --build                 # agora o boot aplica as migrations
+```
+
+## Diferenças em relação ao template de Web API de referência
+
+A estrutura segue um template de Web API de referência (Clean Architecture + CQRS + Repository/UoW + OData),
+com adaptações deliberadas para este projeto:
+
+| Template | FieldFlow | Motivo |
+|---|---|---|
+| Projeto único com pastas `src/Core`, `src/Infrastructure`, `src/Presentation` | 4 projetos (`Domain`, `Application`, `Infrastructure`, `Api`) | Regras de dependência verificáveis por NetArchTest |
+| Interfaces de repositório na Infrastructure | Interfaces no Domain | Application não pode depender de Infrastructure |
+| Regras lançam `AppException` | Domínio devolve `Result`; `AppException` só na borda | Máquina de estados testável sem exceções (ADR 0002) |
+| `ApiErrorResponse` próprio | Problem Details (RFC 7807) com `code`/`errors` | Padrão de mercado; o front mapeia `errors` nos campos |
+| Keycloak + tabelas de permissão em SQL Server | JWT próprio (Fase 2) | Demo sobe com `docker compose up` (ADR 0003) |
+| `SiteId` multi-tenant e header `module` | Removidos | Fora do escopo do produto (multi-tenant é "próximo passo") |
+| `HasColumnName` explícito por coluna | `UseSnakeCaseNamingConvention()` + tabelas/PKs nomeadas | Mesmo resultado no banco, menos ruído |
+| `DELETE` chama `MarkDeleted` no repositório | Interceptor converte todo `Remove` em soft delete | Impossível fazer hard delete por engano |

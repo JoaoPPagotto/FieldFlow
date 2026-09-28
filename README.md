@@ -28,6 +28,8 @@ docker compose up --build
 # Health:  http://localhost:8080/health/ready
 ```
 
+Com dados de demonstração (3 clientes, 12 ativos, 5 técnicos, ~80 OS) quando `SEED_DEMO_DATA=true`.
+
 Sem Docker (precisa de um Postgres local):
 
 ```bash
@@ -50,12 +52,30 @@ backend/
     └── FieldFlow.Api.IntegrationTests/   # Testcontainers + testes de arquitetura
 ```
 
-Detalhes em [docs/architecture.md](docs/architecture.md).
+Detalhes em [docs/architecture.md](docs/architecture.md) e [docs/domain-model.md](docs/domain-model.md).
+
+## Destaques técnicos
+
+- **Máquina de estados no domínio** — `WorkOrder` protege as próprias invariantes; o setter de `Status` é privado
+  e toda transição gera um evento imutável na timeline.
+- **SLA em horário comercial** — `SlaCalculator` conta só horas úteis, pula fins de semana e feriados e desconta
+  pausas; coberto por testes de tabela (`[Theory]`).
+- **Result pattern** — regra de negócio não lança exceção; a borda traduz para Problem Details (400/404/409/422).
+- **Soft delete global** — query filter aplicado por reflexão a toda entidade de `BaseEntity`, e um interceptor
+  transforma qualquer `DELETE` em `UPDATE is_deleted = true`.
+- **Testes de arquitetura** — NetArchTest quebra o build se o Domain referenciar EF Core, MediatR etc.
+
+## Testes
+
+```bash
+cd backend
+dotnet test          # testes de integração usam Testcontainers → Docker precisa estar rodando
+```
 
 ## Roadmap
 
 - [x] Fase 0 — Fundação (solução, Docker, CI, health checks, testes de arquitetura)
-- [ ] Fase 1 — Domínio e persistência
+- [x] Fase 1 — Domínio e persistência (máquina de estados, SLA em horário comercial, EF Core, seed)
 - [ ] Fase 2 — Autenticação (JWT próprio)
 - [ ] Fase 3 — Cadastros
 - [ ] Fase 4 — Ordens de serviço
